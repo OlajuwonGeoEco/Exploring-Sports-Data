@@ -1,0 +1,264 @@
+---
+title: "Fifa 22 Viz"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+I got a notification from Linkedin that I had in a while (just did last week), and I searched Kaggle for some interesting datasets. My love for football made me narrow down to working with football dataset, I found a FIFA 22 dataset.
+
+I browsed this data, and I wanted my analysis to focus on Nigeria players in FIFA; perhaps I could use the dataset to create metrics for understanding the perfomance of the players and the rewards they receive. 
+
+I created a metric BMI (mass in kg/ m2) as a measure of fitness, and I did some data transformation and little data visualization on this data set. 
+
+
+
+This is for importing your data set, file.choose() to browse the files; I use read_csv sometimes.
+
+
+```{r}
+Fifa22<-(read.csv(file.choose(),header=T))
+```
+
+tidyverse, ggplot, correlation all loaded!!!
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(correlation)
+```
+
+Let's see what the data set looks like.
+
+```{r}
+head(Fifa22)
+tail(Fifa22)
+View(Fifa22)
+```
+
+
+ Creating a new variable in the data set called BMI, I had to convert cm to m by dividing by 100, and the parentheses must match.
+```{r}
+Fifa22<-mutate(Fifa22, BMI = (weight_kg/ ((height_cm/100)^2)))
+
+```
+
+TIme to filter the dataset, we need only Nigerian players. I chose some metrics such as age, pace, shooting etc, to garner information about these players.
+
+```{r}
+Nfifa22<-select(filter(Fifa22, nationality_name == 'Nigeria'), short_name,BMI, overall, age, pace,league_name,club_position,shooting, dribbling, defending, physic,wage_eur)
+
+Nfifa22
+```
+
+
+It's time to see how these selected variables are related 
+
+I removed the non-numeric variables to enable me run a complete X by Y correl for the entire dataset
+
+
+```{r}
+correl<-Nfifa22 %>% 
+  select(-short_name, -league_name, -club_position)
+
+head(correl, 5)
+```
+
+Behold our correlation result. Let's do some interpretations. 
+
+
+```{r}
+
+
+round(cor(correl, use="complete.obs"), digits=2)
+```
+
+
+Stand outs?
+
+Positive correlation 
+
+Wage_eur and Overall 0.70 (Wage_eur is the amount paid to the players in euro, while overall is the overall rating given to the player). This make sense, as it is expected for players with rating to have a linear relationship with earnings.
+
+shooting and dribbling 0.63 (shooting is the ability to kick the ball, generating enough force for the ball to move with precision, speed and impact, very interesting to see that this relates to how well Nigerian players dribble).
+
+dribbing and overall 0.60 (dribbling is the ability to take the ball past another player while maintaining the ball). The data suggests that better dribblers might be better football players (Ronaldo, Vinicius, Isco, Salah, Sterling)
+
+pace and dribbling 0.56 The result suggest that that faster Nigerian players are better dribblers, and vice versa.
+
+defending and shooting -0.55, This result suggest that defenders don't have good shooting (Well a few does)
+
+
+
+Lets do a visualization  to see how these stats 
+
+```{r}
+ggplot(Nfifa22)+
+  geom_jitter(aes(wage_eur,overall, size=wage_eur, color=overall))+
+  scale_color_gradient(low="orange", high="purple")+
+  theme_classic()+
+  labs(title = "WAGES VS OVERALL STATS",x="Wages in Euros",y= "Overall Stats")  
+```
+
+
+
+
+
+
+
+I had to filter the data, and revisualize to view the spread of stats for those below 50,000 euros
+```{r}
+normalwages<- filter(Nfifa22, wage_eur<= 50000) 
+
+ggplot(normalwages)+
+  geom_jitter(aes(wage_eur,overall, size=wage_eur, color=overall))+
+  scale_color_gradient(low="orange", high="purple")+
+  theme_classic()+
+  labs(title = "WAGES VS OVERALL STATS",x="Wages in Euros",y= "Overall Stats") 
+```
+
+
+
+```{r}
+ggplot(Nfifa22)+
+  geom_jitter(aes(dribbling,shooting, size=wage_eur, color=dribbling))+
+  scale_color_gradient(low="orange", high="purple")+
+  theme_classic()+
+  labs(title = "Dribbling VS Shooting",x="Dribbling",y= "Shooting")  
+```
+
+We could use gg labels to know this awesome player that has low dribbling and shooting but is paid fairly well. Post for another day...
+
+
+
+
+
+```{r}
+ggplot(Nfifa22)+
+  geom_jitter(aes(defending,shooting, size=wage_eur, color=defending))+
+  scale_color_gradient(low="orange", high="purple")+
+  theme_classic()+
+  labs(title = "Defending VS Shooting",x="Defending",y= "Shooting")  
+```
+
+Graph suggests that they are Nigerian footballers with strong defending abilities and an average shooting but they are still being paid well.
+
+
+
+Let's see how our boys rank by BMI......
+
+
+```{r}
+N<-Nfifa22 %>% 
+  arrange(desc(BMI)) 
+
+N
+```
+We see quite a number of the Nigerian players are over the BMI value of 24.9
+
+
+
+
+
+
+
+
+```{r}
+P<-Nfifa22 %>% 
+  arrange((BMI)) 
+
+P
+```
+
+
+
+
+
+
+
+
+```{r}
+P<-Nfifa22 %>% 
+  arrange(desc(overall)) 
+
+P
+```
+
+
+The best Nigerian players on Fifa 22, suprisingly they all play in europe, and only one has a BMI that's over 24.9.. Additionally, he has retired from the Nigerian football team
+
+
+
+I want to run some grouped filtering.
+
+
+
+```{r}
+by_lg <- group_by(Nfifa22, league_name)
+
+summarise(by_lg,n= n()) %>% 
+  arrange (desc(n))
+```
+
+
+We have leagues with just one player. I'd have to use median to do my analysis.
+
+
+
+
+What's the mean pay for each league
+```{r}
+by_lg <- group_by(Nfifa22, league_name)
+
+summarise(by_lg, BMI_Mean = mean(BMI, na.rm = TRUE),overall_Mean= mean(overall, na.rm = TRUE), wage_Mean= mean(wage_eur, na.rm = TRUE)) %>% arrange(desc(wage_Mean))-> pay
+
+head(pay,10)
+tail(pay,10)
+```
+
+
+The boys in ENgland make the most bag, while those in Indian Super league, 
+
+
+What's the median BMI for each league
+
+```{r}
+summarise(by_lg, BMI_AVG = mean(BMI, na.rm = TRUE),overall_AVG= mean(overall, na.rm = TRUE), wage_AVG= mean(wage_eur, na.rm = TRUE)) %>% arrange(desc(BMI_AVG))-> BM
+
+head(BM,10)
+tail(BM,10)
+```
+
+The French Ligue 2 and the Indian League might not be physically challenging compared to other leagues.
+
+
+
+
+Which leagues have the highest rating
+
+```{r}
+summarise(by_lg, BMI_AVG = mean(BMI, na.rm = TRUE),overall_AVG= mean(overall, na.rm = TRUE), wage_AVG= mean(wage_eur, na.rm = TRUE)) %>% arrange(desc(overall_AVG))-> BMM
+
+head(BMM,10)
+tail(BMM,10)
+```
+
+From this short analysis using the Fifa 22 dataset, Nigerian players in England, and Russia earn more than their counterparts playing in other countries. There are some Nigerian players that have ratings that are much higher than others. Also, there is no clear relationship between BMI, and Nigerian football players metrics.
+
+
+
+
+
+
+
+
+
+
+
+
